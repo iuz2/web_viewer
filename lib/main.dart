@@ -142,63 +142,52 @@ Widget build(BuildContext context) {
       if (mounted) setState(() { _activePort = null; _controller = null; });
     },
     child: Scaffold(
-      body: Stack(
-        children: [
-          _activePort == null
-              ? SafeArea(child: _buildPortSelector())
-              : _buildWebView(),
-          if (_activePort != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Row(
-                    children: [
-                      _floatingBtn(
-                        icon: Icons.arrow_back,
-                        onTap: () => setState(() { _activePort = null; _controller = null; }),
-                      ),
-                      const SizedBox(width: 10),
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: _serverDead ? Colors.red : Colors.green,
-                          shape: BoxShape.circle,
-                          boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4)],
-                        ),
-                      ),
-                      const Spacer(),
-                      _floatingBtn(
-                        icon: Icons.refresh,
-                        onTap: () { _controller?.reload(); setState(() => _serverDead = false); },
-                      ),
-                    ],
-                  ),
+      backgroundColor: const Color(0xFF181512),
+      appBar: _activePort != null
+          ? AppBar(
+              backgroundColor: const Color(0xFF181512),
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              leadingWidth: 60,
+              leading: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: _glassBtn(
+                  icon: Icons.arrow_back,
+                  onTap: () => setState(() { _activePort = null; _controller = null; }),
                 ),
               ),
-            ),
-        ],
-      ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _glassBtn(
+                    icon: Icons.refresh,
+                    onTap: () { _controller?.reload(); setState(() => _serverDead = false); },
+                  ),
+                ),
+              ],
+            )
+          : null,
+      body: _activePort == null
+          ? SafeArea(child: _buildPortSelector())
+          : _buildWebView(),
     ),
   );
 }
 
-Widget _floatingBtn({required IconData icon, required VoidCallback onTap}) {
-  return GestureDetector(
-    onTap: onTap,
-    child: Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.55),
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white30, width: 1),
+Widget _glassBtn({required IconData icon, required VoidCallback onTap}) {
+  return Center(
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.15),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
       ),
-      child: Icon(icon, color: Colors.white, size: 22),
     ),
   );
 }
