@@ -1,10 +1,15 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:ui' show ImageFilter;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-
-void main() => runApp(const WebViewerApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  runApp(const WebViewerApp());
+}
 
 class WebViewerApp extends StatelessWidget {
   const WebViewerApp({super.key});

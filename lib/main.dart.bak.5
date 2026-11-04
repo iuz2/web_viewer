@@ -129,50 +129,68 @@ class _ViewerScreenState extends State<ViewerScreen> with WidgetsBindingObserver
         ..loadRequest(Uri.parse('http://localhost:$port'));
     });
   }
+@override
+Widget build(BuildContext context) {
+  return PopScope(
+    canPop: _activePort == null,
+    onPopInvokedWithResult: (didPop, _) async {
+      if (didPop) return;
+      if (_controller != null && await _controller!.canGoBack()) {
+        await _controller!.goBack();
+        return;
+      }
+      if (mounted) setState(() { _activePort = null; _controller = null; });
+    },
+    child: Scaffold(
+      backgroundColor: const Color(0xFF181512),
+      appBar: _activePort != null
+          ? AppBar(
+              backgroundColor: const Color(0xFF181512),
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              leadingWidth: 60,
+              leading: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: _glassBtn(
+                  icon: Icons.arrow_back,
+                  onTap: () => setState(() { _activePort = null; _controller = null; }),
+                ),
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _glassBtn(
+                    icon: Icons.refresh,
+                    onTap: () { _controller?.reload(); setState(() => _serverDead = false); },
+                  ),
+                ),
+              ],
+            )
+          : null,
+      body: _activePort == null
+          ? SafeArea(child: _buildPortSelector())
+          : _buildWebView(),
+    ),
+  );
+}
 
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _activePort == null,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        if (_controller != null && await _controller!.canGoBack()) {
-          await _controller!.goBack();
-          return;
-        }
-        if (mounted) setState(() { _activePort = null; _controller = null; });
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: _activePort != null
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => setState(() { _activePort = null; _controller = null; }),
-                )
-              : null,
-          title: Row(children: [
-            Container(
-              width: 10, height: 10,
-              decoration: BoxDecoration(
-                color: _activePort == null ? Colors.grey : (_serverDead ? Colors.red : Colors.green),
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(_activePort == null ? 'Web Viewer' : 'localhost:$_activePort'),
-          ]),
-          actions: [
-            if (_activePort != null)
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () { _controller?.reload(); setState(() => _serverDead = false); },
-              ),
-          ],
+Widget _glassBtn({required IconData icon, required VoidCallback onTap}) {
+  return Center(
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.15),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
         ),
-        body: _activePort == null ? _buildPortSelector() : _buildWebView(),
+        child: Icon(icon, color: Colors.white, size: 20),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildPortSelector() {
     return Padding(
