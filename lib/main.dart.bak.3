@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   runApp(const WebViewerApp());
 }
 
@@ -148,16 +147,21 @@ Widget build(BuildContext context) {
       if (mounted) setState(() { _activePort = null; _controller = null; });
     },
     child: AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
+      value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: isViewing ? Brightness.dark : Brightness.light,
+        statusBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFF181512),
         body: isViewing
             ? Stack(
                 children: [
-                  Positioned.fill(child: _buildWebView()),
+                  Positioned.fill(
+                    child: SafeArea(
+                      bottom: false,
+                      child: _buildWebView(),
+                    ),
+                  ),
                   Positioned(
                     top: 0,
                     left: 0,
