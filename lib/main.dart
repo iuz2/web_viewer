@@ -156,7 +156,12 @@ Widget build(BuildContext context) {
         body: isViewing
             ? Stack(
                 children: [
-                  Positioned.fill(child: _buildWebView()),
+                  Positioned.fill(
+                    child: SafeArea(
+                      bottom: false,
+                      child: _buildWebView(),
+                    ),
+                  ),
                   Positioned(
                     top: 0,
                     left: 0,

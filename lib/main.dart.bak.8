@@ -1,0 +1,280 @@
+import 'dart:async';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+void main() => runApp(const WebViewerApp());
+
+class WebViewerApp extends StatelessWidget {
+  const WebViewerApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Web Viewer',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF181512),
+        appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF241F1B), elevation: 1),
+        colorScheme: const ColorScheme.dark(primary: Color(0xFFE0A96D), surface: Color(0xFF241F1B)),
+        useMaterial3: true,
+      ),
+      home: const ViewerScreen(),
+    );
+  }
+}
+
+class ViewerScreen extends StatefulWidget {
+  const ViewerScreen({super.key});
+  @override
+  State<ViewerScreen> createState() => _ViewerScreenState();
+}
+
+class _ViewerScreenState extends State<ViewerScreen> with WidgetsBindingObserver {
+  final TextEditingController _portController = TextEditingController(text: '8080');
+  WebViewController? _controller;
+  int? _activePort;
+  bool _loading = false;
+  bool _serverDead = false;
+  List<int> _scanResults = [];
+  bool _scanned = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadSavedPort();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _portController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _activePort != null) _checkAndReload();
+  }
+
+  Future<void> _loadSavedPort() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getInt('last_port');
+    if (saved != null && saved > 0 && mounted) {
+      setState(() => _portController.text = saved.toString());
+    }
+  }
+
+  Future<void> _savePort(int port) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('last_port', port);
+  }
+
+  Future<bool> _isPortOpen(int port) async {
+    try {
+      final socket = await Socket.connect('127.0.0.1', port, timeout: const Duration(milliseconds: 500));
+      socket.destroy();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _checkAndReload() async {
+    if (_activePort == null) return;
+    final alive = await _isPortOpen(_activePort!);
+    if (!mounted) return;
+    if (!alive && !_serverDead) {
+      setState(() => _serverDead = true);
+    } else if (alive && _serverDead) {
+      setState(() => _serverDead = false);
+      _controller?.reload();
+    }
+  }
+
+  Future<void> _scanPorts() async {
+    setState(() { _loading = true; _scanResults = []; _scanned = false; });
+    const common = [3000, 3001, 4000, 5000, 5173, 8000, 8080, 8081, 8090, 8888, 9000];
+    final found = <int>[];
+    for (final p in common) {
+      if (await _isPortOpen(p)) found.add(p);
+    }
+    if (!mounted) return;
+    setState(() { _scanResults = found; _loading = false; _scanned = true; });
+  }
+
+  Future<void> _connectToPort(int port) async {
+    final alive = await _isPortOpen(port);
+    if (!alive) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Port $port tidak aktif')));
+      }
+      return;
+    }
+    await _savePort(port);
+    if (!mounted) return;
+    setState(() {
+      _activePort = port;
+      _serverDead = false;
+      _controller = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(const Color(0xFF181512))
+        ..setNavigationDelegate(NavigationDelegate(
+          onWebResourceError: (err) {
+            if (mounted && err.isForMainFrame == true) setState(() => _serverDead = true);
+          },
+        ))
+        ..loadRequest(Uri.parse('http://localhost:$port'));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: _activePort == null,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (_controller != null && await _controller!.canGoBack()) {
+          await _controller!.goBack();
+          return;
+        }
+        if (mounted) setState(() { _activePort = null; _controller = null; });
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: _activePort != null
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => setState(() { _activePort = null; _controller = null; }),
+                )
+              : null,
+          title: Row(children: [
+            Container(
+              width: 10, height: 10,
+              decoration: BoxDecoration(
+                color: _activePort == null ? Colors.grey : (_serverDead ? Colors.red : Colors.green),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(_activePort == null ? 'Web Viewer' : 'localhost:$_activePort'),
+          ]),
+          actions: [
+            if (_activePort != null)
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () { _controller?.reload(); setState(() => _serverDead = false); },
+              ),
+          ],
+        ),
+        body: _activePort == null ? _buildPortSelector() : _buildWebView(),
+      ),
+    );
+  }
+
+  Widget _buildPortSelector() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: ListView(children: [
+        const Text('Pilih Port', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        const Text('Pastikan server sudah jalan di Terminal:', style: TextStyle(color: Colors.grey, fontSize: 13)),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: const Color(0xFF241F1B), borderRadius: BorderRadius.circular(8)),
+          child: const SelectableText(
+            'cd /sdcard/development && python3 -m http.server 8080',
+            style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFFE0A96D)),
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _portController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Port', hintText: '8080', border: OutlineInputBorder()),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: () {
+            final port = int.tryParse(_portController.text);
+            if (port != null && port > 0 && port < 65536) {
+              _connectToPort(port);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Port tidak valid')));
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE0A96D),
+            foregroundColor: const Color(0xFF181512),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('Buka WebView'),
+        ),
+        const SizedBox(height: 20),
+        const Divider(),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: _loading ? null : _scanPorts,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF241F1B),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          icon: _loading
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.search),
+          label: Text(_loading ? 'Scanning...' : 'Scan Port Aktif'),
+        ),
+        const SizedBox(height: 16),
+        if (_scanned && _scanResults.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('Tidak ada port aktif ditemukan.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+          ),
+        ..._scanResults.map((p) => Card(
+          color: const Color(0xFF241F1B),
+          child: ListTile(
+            leading: const Icon(Icons.check_circle, color: Colors.green),
+            title: Text('localhost:$p', style: const TextStyle(fontFamily: 'monospace')),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () { _portController.text = p.toString(); _connectToPort(p); },
+          ),
+        )),
+      ]),
+    );
+  }
+
+  Widget _buildWebView() {
+    if (_serverDead) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text('Port $_activePort mati', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () async {
+                final alive = await _isPortOpen(_activePort!);
+                if (alive) {
+                  setState(() => _serverDead = false);
+                  _controller?.reload();
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Port masih mati')));
+                }
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Coba Lagi'),
+            ),
+          ]),
+        ),
+      );
+    }
+    if (_controller == null) return const Center(child: CircularProgressIndicator());
+    return WebViewWidget(controller: _controller!);
+  }
+}
