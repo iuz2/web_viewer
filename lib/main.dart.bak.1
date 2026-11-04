@@ -152,7 +152,7 @@ Widget build(BuildContext context) {
     },
     child: AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor: Color(0xFF181512),
+        statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
@@ -196,10 +196,10 @@ Widget build(BuildContext context) {
     ),
   );
 }
-
-Widget _glassBtn({required IconData icon, required VoidCallback onTap}) {
+Widget _glassBtn({required IconData icon, required VoidCallback onTap, VoidCallback? onLongPress}) {
   return GestureDetector(
     onTap: onTap,
+    onLongPress: onLongPress,
     child: ClipOval(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),

@@ -177,7 +177,17 @@ Widget build(BuildContext context) {
                           children: [
                             _glassBtn(
                               icon: Icons.arrow_back,
-                              onTap: () => setState(() { _activePort = null; _controller = null; }),
+                              onTap: () async {
+                                if (_controller != null && await _controller!.canGoBack()) {
+                                  await _controller!.goBack();
+                                } else if (mounted) {
+                                  setState(() { _activePort = null; _controller = null; });
+                                }
+                              },
+                              onLongPress: () {
+                                HapticFeedback.mediumImpact();
+                                setState(() { _activePort = null; _controller = null; });
+                              },
                             ),
                             const Spacer(),
                             _glassBtn(
@@ -196,10 +206,10 @@ Widget build(BuildContext context) {
     ),
   );
 }
-
-Widget _glassBtn({required IconData icon, required VoidCallback onTap}) {
+Widget _glassBtn({required IconData icon, required VoidCallback onTap, VoidCallback? onLongPress}) {
   return GestureDetector(
     onTap: onTap,
+    onLongPress: onLongPress,
     child: ClipOval(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),

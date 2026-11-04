@@ -147,16 +147,21 @@ Widget build(BuildContext context) {
       if (mounted) setState(() { _activePort = null; _controller = null; });
     },
     child: AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: isViewing ? Brightness.dark : Brightness.light,
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Color(0xFF181512),
+        statusBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFF181512),
         body: isViewing
             ? Stack(
                 children: [
-                  Positioned.fill(child: _buildWebView()),
+                  Positioned.fill(
+                    child: SafeArea(
+                      bottom: false,
+                      child: _buildWebView(),
+                    ),
+                  ),
                   Positioned(
                     top: 0,
                     left: 0,
