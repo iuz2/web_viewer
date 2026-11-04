@@ -129,50 +129,79 @@ class _ViewerScreenState extends State<ViewerScreen> with WidgetsBindingObserver
         ..loadRequest(Uri.parse('http://localhost:$port'));
     });
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _activePort == null,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        if (_controller != null && await _controller!.canGoBack()) {
-          await _controller!.goBack();
-          return;
-        }
-        if (mounted) setState(() { _activePort = null; _controller = null; });
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          leading: _activePort != null
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => setState(() { _activePort = null; _controller = null; }),
-                )
-              : null,
-          title: Row(children: [
-            Container(
-              width: 10, height: 10,
-              decoration: BoxDecoration(
-                color: _activePort == null ? Colors.grey : (_serverDead ? Colors.red : Colors.green),
-                shape: BoxShape.circle,
+@override
+Widget build(BuildContext context) {
+  return PopScope(
+    canPop: _activePort == null,
+    onPopInvokedWithResult: (didPop, _) async {
+      if (didPop) return;
+      if (_controller != null && await _controller!.canGoBack()) {
+        await _controller!.goBack();
+        return;
+      }
+      if (mounted) setState(() { _activePort = null; _controller = null; });
+    },
+    child: Scaffold(
+      body: Stack(
+        children: [
+          _activePort == null
+              ? SafeArea(child: _buildPortSelector())
+              : _buildWebView(),
+          if (_activePort != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Row(
+                    children: [
+                      _floatingBtn(
+                        icon: Icons.arrow_back,
+                        onTap: () => setState(() { _activePort = null; _controller = null; }),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: _serverDead ? Colors.red : Colors.green,
+                          shape: BoxShape.circle,
+                          boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4)],
+                        ),
+                      ),
+                      const Spacer(),
+                      _floatingBtn(
+                        icon: Icons.refresh,
+                        onTap: () { _controller?.reload(); setState(() => _serverDead = false); },
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(width: 10),
-            Text(_activePort == null ? 'Web Viewer' : 'localhost:$_activePort'),
-          ]),
-          actions: [
-            if (_activePort != null)
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () { _controller?.reload(); setState(() => _serverDead = false); },
-              ),
-          ],
-        ),
-        body: _activePort == null ? _buildPortSelector() : _buildWebView(),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
+
+Widget _floatingBtn({required IconData icon, required VoidCallback onTap}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white30, width: 1),
+      ),
+      child: Icon(icon, color: Colors.white, size: 22),
+    ),
+  );
+}
 
   Widget _buildPortSelector() {
     return Padding(
